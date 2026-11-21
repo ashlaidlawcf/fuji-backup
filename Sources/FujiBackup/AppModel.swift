@@ -18,7 +18,7 @@ final class AppModel {
         let firmware: String?
     }
 
-    let link = CameraLink()
+    let link: CameraLink
     let library: BackupLibrary
     private(set) var activity: Activity?
     var notice: Notice?
@@ -27,8 +27,9 @@ final class AppModel {
 
     var canBackUp: Bool { activity == nil && link.info != nil }
 
-    init(library: BackupLibrary = BackupLibrary()) {
+    init(library: BackupLibrary = BackupLibrary(), link: CameraLink = CameraLink()) {
         self.library = library
+        self.link = link
         library.reload()
     }
 

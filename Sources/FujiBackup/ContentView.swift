@@ -11,6 +11,13 @@ struct ContentView: View {
             CameraHeader(model: model)
             Divider()
             BackupList(model: model)
+                // On a different view from the notice alert: only one alert per view is shown.
+                .alert(restoreTitle, isPresented: restoring, presenting: model.pendingRestore) { pending in
+                    Button("Cancel", role: .cancel) {}
+                    Button("Restore", role: .destructive) { Task { await model.restore(pending) } }
+                } message: { pending in
+                    Text("All camera settings, including custom settings C1–C7, will be replaced with “\(pending.url.deletingPathExtension().lastPathComponent)”. The camera’s current settings are backed up first.")
+                }
         }
         .frame(minWidth: 440, minHeight: 440)
         .toolbar {
@@ -31,17 +38,23 @@ struct ContentView: View {
                 if scoped { url.stopAccessingSecurityScopedResource() }
             }
         }
-        .alert(item: $model.pendingRestore) { pending in
-            Alert(
-                title: Text("Restore Settings to Your \(model.link.info?.model ?? pending.backup.model)?"),
-                message: Text("All camera settings, including custom settings C1–C7, will be replaced with “\(pending.url.deletingPathExtension().lastPathComponent)”. The camera’s current settings are backed up first."),
-                primaryButton: .destructive(Text("Restore")) { Task { await model.restore(pending) } },
-                secondaryButton: .cancel()
-            )
+        .alert(model.notice?.title ?? "", isPresented: showingNotice, presenting: model.notice) { _ in
+            Button("OK") {}
+        } message: { notice in
+            Text(notice.message)
         }
-        .alert(item: $model.notice) { notice in
-            Alert(title: Text(notice.title), message: Text(notice.message))
-        }
+    }
+
+    private var restoreTitle: String {
+        "Restore Settings to Your \(model.link.info?.model ?? model.pendingRestore?.backup.model ?? "Camera")?"
+    }
+
+    private var restoring: Binding<Bool> {
+        Binding(get: { model.pendingRestore != nil }, set: { if !$0 { model.pendingRestore = nil } })
+    }
+
+    private var showingNotice: Binding<Bool> {
+        Binding(get: { model.notice != nil }, set: { if !$0 { model.notice = nil } })
     }
 }
 

@@ -23,11 +23,12 @@ final class CameraLink: NSObject {
 
     static let fujifilmVendorID = 0x04CB
 
-    override init() {
+    /// `watchUSB: false` never looks for cameras (debug demo mode), so it can't send anything to one.
+    init(watchUSB: Bool = true) {
         super.init()
         browser.delegate = self
         browser.browsedDeviceTypeMask = ICDeviceTypeMask(rawValue: ICDeviceTypeMask.camera.rawValue | ICDeviceLocationTypeMask.local.rawValue)!
-        browser.start()
+        if watchUSB { browser.start() }
     }
 
     var info: DeviceInfo? {

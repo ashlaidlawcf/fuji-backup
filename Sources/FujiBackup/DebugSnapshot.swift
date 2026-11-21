@@ -3,10 +3,13 @@ import AppKit
 import FujiBackupCore
 
 /// Debug builds only. FUJIBACKUP_DEMO=ready|wrongmode|empty shows sample state without a camera;
-/// FUJIBACKUP_SNAPSHOT=<file.png> saves the window as a picture and quits.
+/// FUJIBACKUP_SNAPSHOT=<file.png> saves the window as a picture and quits;
+/// FUJIBACKUP_CHECK=notice shows a message alert and reports whether it appeared, and quits;
+/// FUJIBACKUP_CHECK=restore-prompt asks to restore the newest backup, prints whether a confirmation sheet appeared, and quits.
 @MainActor
 enum DebugSnapshot {
     static let env = ProcessInfo.processInfo.environment
+    private static var demoModel: AppModel?
 
     static func model() -> AppModel {
         guard let demo = env["FUJIBACKUP_DEMO"] else { return AppModel() }
@@ -23,7 +26,8 @@ enum DebugSnapshot {
                 try? FileManager.default.setAttributes([.creationDate: date], ofItemAtPath: url.path)
             }
         }
-        let model = AppModel(library: BackupLibrary(folder: folder))
+        let model = AppModel(library: BackupLibrary(folder: folder), link: CameraLink(watchUSB: false))
+        demoModel = model
         switch demo {
         case "wrongmode": model.link.demo(.wrongMode(name: "X-T3"))
         case "searching": break
@@ -33,6 +37,8 @@ enum DebugSnapshot {
     }
 
     static func takeIfRequested() async {
+        if env["FUJIBACKUP_CHECK"] == "restore-prompt" { await checkRestorePrompt() }
+        if env["FUJIBACKUP_CHECK"] == "notice" { await checkNotice() }
         guard let path = env["FUJIBACKUP_SNAPSHOT"] else { return }
         guard let window = NSApp.windows.first(where: \.isVisible) else { exit(1) }
         window.setContentSize(NSSize(width: 500, height: 520))
@@ -42,6 +48,27 @@ enum DebugSnapshot {
         frame.cacheDisplay(in: frame.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
         exit(0)
+    }
+
+    private static func checkNotice() async {
+        try? await Task.sleep(for: .seconds(1))
+        guard let model = demoModel, let window = NSApp.windows.first(where: \.isVisible) else { print("notice: no demo"); exit(2) }
+        model.notice = AppModel.Notice(title: "Test", message: "Test message")
+        try? await Task.sleep(for: .seconds(1.5))
+        let shown = window.attachedSheet != nil
+        print("notice: sheet=\(shown)")
+        exit(shown ? 0 : 1)
+    }
+
+    private static func checkRestorePrompt() async {
+        try? await Task.sleep(for: .seconds(1))
+        guard let model = demoModel, let item = model.library.items.first,
+              let window = NSApp.windows.first(where: \.isVisible) else { print("restore-prompt: no demo"); exit(2) }
+        model.askToRestore(item.url)
+        try? await Task.sleep(for: .seconds(1.5))
+        let shown = window.attachedSheet != nil
+        print("restore-prompt: pending=\(model.pendingRestore != nil) sheet=\(shown)")
+        exit(shown ? 0 : 1)
     }
 }
 #endif
