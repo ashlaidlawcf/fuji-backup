@@ -34,7 +34,7 @@ Backup and restore are standard PTP operations on object handle 0, which the cam
 | Back up | GetObjectInfo(0), GetObject(0) |
 | Restore | SendObjectInfo(0, 0) with a 1076-byte ObjectInfo (format 0x5000, the file's size, zeros), then SendObject |
 
-The camera rejects a read and a write in one session, so each runs in a session of its own. The protocol details come from community reverse-engineering: [fujifilm-ptp-reference](https://github.com/zgrimz/fujifilm-ptp-reference), [grawji](https://github.com/p5k369/grawji) and [libfuji](https://github.com/petabyt/libfuji). This is not a Fujifilm product.
+The camera rejects a read and a write in one session, so each runs in a session of its own. The protocol details come from community reverse-engineering (see [Credits](#credits)).
 
 ## Reading recipes
 
@@ -56,6 +56,20 @@ Official firmware doesn't save the white balance shift with a custom setting (on
 | Interface states | rendered on a Mac without a camera |
 | Backup and restore on an X-T3 | camera |
 | Recipes read from a real X-T3 backup | names and values plausible; not yet checked setting by setting against the camera |
+
+## Credits
+
+Fuji Backup stands on other people's reverse-engineering. Thank you to:
+
+- **[fujifilm-ptp-reference](https://github.com/zgrimz/fujifilm-ptp-reference)** by Zachary Grimshaw: a clear, tested reference for Fujifilm's USB protocol. It's where this app learned about backup mode (property 0xD16E), the backup and restore sequence, and the backup file's header.
+- **[grawji](https://github.com/p5k369/grawji)**: the restore details (the 1076-byte ObjectInfo, separate sessions for reading and writing) and the X-T3 backup layout, worked out from controlled backups on real cameras. Its findings on where each recipe setting lives, and on how highlight, shadow, noise reduction, grain and Color Chrome are stored, made the recipe view possible.
+- **[libfuji](https://github.com/petabyt/libfuji)** by petabyt: an open implementation of Fujifilm's USB features, including settings backup and restore, that confirmed the sequence.
+
+No code was copied from these projects. This app uses their published findings, checked against the X-T3's own firmware where possible.
+
+The app has no third-party dependencies. It is built with Apple's Swift, SwiftUI and ImageCaptureCore.
+
+Fujifilm, X-T3 and X Acquire are Fujifilm's. This project is not affiliated with Fujifilm.
 
 ## Debug builds
 
