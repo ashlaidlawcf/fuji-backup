@@ -196,25 +196,39 @@ private struct BackupList: View {
             List(selection: $model.selection) {
                 Section("Backups") {
                     ForEach(model.library.items) { item in
-                        BackupRow(item: item, canRestore: model.canBackUp) { model.askToRestore(item.url) }
+                        BackupRow(item: item, canRestore: model.canBackUp,
+                                  showRecipes: { model.viewing = item },
+                                  restore: { model.askToRestore(item.url) })
                             .tag(item.id)
-                            .contextMenu {
-                                Button("Restore to Camera…") { model.askToRestore(item.url) }.disabled(!model.canBackUp)
-                                Button("Show in Finder") { model.library.reveal(item) }
-                                Divider()
-                                Button("Move to Trash", role: .destructive) { model.library.trash(item) }
-                            }
                     }
                 }
             }
             .listStyle(.inset)
+            .contextMenu(forSelectionType: BackupLibrary.Item.ID.self) { ids in
+                if let item = item(ids) {
+                    Button("Show Recipes") { model.viewing = item }
+                    Button("Restore to Camera…") { model.askToRestore(item.url) }.disabled(!model.canBackUp)
+                    Button("Show in Finder") { model.library.reveal(item) }
+                    Divider()
+                    Button("Move to Trash", role: .destructive) { model.library.trash(item) }
+                }
+            } primaryAction: { ids in
+                model.viewing = item(ids)          // double-click or Return
+            }
+            .sheet(item: $model.viewing) { RecipesView(item: $0) }
         }
+    }
+
+    private func item(_ ids: Set<BackupLibrary.Item.ID>) -> BackupLibrary.Item? {
+        guard ids.count == 1 else { return nil }
+        return model.library.items.first { $0.id == ids.first }
     }
 }
 
 private struct BackupRow: View {
     let item: BackupLibrary.Item
     let canRestore: Bool
+    let showRecipes: () -> Void
     let restore: () -> Void
     @State private var hovering = false
 
@@ -232,10 +246,12 @@ private struct BackupRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Restore…", action: restore)
-                .controlSize(.small)
-                .disabled(!canRestore)
-                .opacity(hovering ? 1 : 0)
+            HStack(spacing: 6) {
+                Button("Recipes", action: showRecipes)
+                Button("Restore…", action: restore).disabled(!canRestore)
+            }
+            .controlSize(.small)
+            .opacity(hovering ? 1 : 0)
         }
         .padding(.vertical, 4)
         .onHover { hovering = $0 }

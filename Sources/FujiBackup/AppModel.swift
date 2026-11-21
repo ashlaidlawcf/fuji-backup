@@ -24,6 +24,7 @@ final class AppModel {
     var notice: Notice?
     var pendingRestore: PendingRestore?
     var selection: BackupLibrary.Item.ID?
+    var viewing: BackupLibrary.Item?
 
     var canBackUp: Bool { activity == nil && link.info != nil }
 

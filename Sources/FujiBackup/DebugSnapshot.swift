@@ -4,6 +4,8 @@ import FujiBackupCore
 
 /// Debug builds only. FUJIBACKUP_DEMO=ready|wrongmode|empty shows sample state without a camera;
 /// FUJIBACKUP_SNAPSHOT=<file.png> saves the window as a picture and quits;
+/// FUJIBACKUP_DEMO_FROM=<folder> uses copies of the backups in that folder;
+/// FUJIBACKUP_CHECK=recipes saves the newest backup's recipes sheet to FUJIBACKUP_SNAPSHOT and quits;
 /// FUJIBACKUP_CHECK=notice shows a message alert and reports whether it appeared, and quits;
 /// FUJIBACKUP_CHECK=restore-prompt asks to restore the newest backup, prints whether a confirmation sheet appeared, and quits.
 @MainActor
@@ -15,7 +17,11 @@ enum DebugSnapshot {
         guard let demo = env["FUJIBACKUP_DEMO"] else { return AppModel() }
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("FujiBackupDemo-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        if demo != "empty" {
+        if let from = env["FUJIBACKUP_DEMO_FROM"] {          // copies of real backups, e.g. ~/Documents/Fuji Backups
+            for url in (try? FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: from), includingPropertiesForKeys: nil)) ?? [] {
+                try? FileManager.default.copyItem(at: url, to: folder.appendingPathComponent(url.lastPathComponent))
+            }
+        } else if demo != "empty" {
             var blob = Data(count: 33_404)
             blob.replaceSubrange(0..<8, with: Data("FUJIFILM".utf8))
             blob.replaceSubrange(0x14..<0x18, with: Data("X-T3".utf8))
@@ -38,6 +44,7 @@ enum DebugSnapshot {
 
     static func takeIfRequested() async {
         if env["FUJIBACKUP_CHECK"] == "restore-prompt" { await checkRestorePrompt() }
+        if env["FUJIBACKUP_CHECK"] == "recipes" { await snapshotRecipes() }
         if env["FUJIBACKUP_CHECK"] == "notice" { await checkNotice() }
         guard let path = env["FUJIBACKUP_SNAPSHOT"] else { return }
         guard let window = NSApp.windows.first(where: \.isVisible) else { exit(1) }
@@ -45,6 +52,20 @@ enum DebugSnapshot {
         try? await Task.sleep(for: .seconds(1.5))
         guard let frame = window.contentView?.superview else { exit(1) }
         guard let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { exit(1) }
+        frame.cacheDisplay(in: frame.bounds, to: rep)
+        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+        exit(0)
+    }
+
+    /// Opens the newest backup's recipes and saves the sheet to FUJIBACKUP_SNAPSHOT.
+    private static func snapshotRecipes() async {
+        try? await Task.sleep(for: .seconds(1))
+        guard let model = demoModel, let path = env["FUJIBACKUP_SNAPSHOT"], let window = NSApp.windows.first(where: \.isVisible)
+        else { print("recipes: no demo"); exit(2) }
+        model.viewing = model.library.items.first
+        try? await Task.sleep(for: .seconds(1.5))
+        guard let sheet = window.attachedSheet, let frame = sheet.contentView?.superview,
+              let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { print("recipes: no sheet"); exit(1) }
         frame.cacheDisplay(in: frame.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
         exit(0)
