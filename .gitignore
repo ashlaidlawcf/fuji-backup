@@ -1,0 +1,6 @@
+.build/
+build/
+*.dat
+*.DAT
+.DS_Store
+.swiftpm/
