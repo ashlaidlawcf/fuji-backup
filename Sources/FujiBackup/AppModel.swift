@@ -25,6 +25,8 @@ final class AppModel {
     var pendingRestore: PendingRestore?
     var selection: BackupLibrary.Item.ID?
     var viewing: BackupLibrary.Item?
+    /// A backup waiting for the person to confirm deleting it.
+    var pendingDelete: BackupLibrary.Item?
 
     var canBackUp: Bool { activity == nil && link.info != nil }
 
@@ -32,6 +34,16 @@ final class AppModel {
         self.library = library
         self.link = link
         library.reload()
+    }
+
+    /// Step 1 of deleting: ask first.
+    func askToDelete(_ item: BackupLibrary.Item) { pendingDelete = item }
+
+    /// Step 2, after the person confirms: move the backup to the Trash, so it can be put back from there.
+    func delete(_ item: BackupLibrary.Item) {
+        if selection == item.id { selection = nil }
+        if viewing == item { viewing = nil }
+        library.trash(item)
     }
 
     func backUp() async {

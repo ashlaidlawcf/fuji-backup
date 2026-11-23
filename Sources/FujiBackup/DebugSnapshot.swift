@@ -5,8 +5,9 @@ import FujiBackupCore
 /// Debug builds only. FUJIBACKUP_DEMO=ready|wrongmode|empty shows sample state without a camera;
 /// FUJIBACKUP_SNAPSHOT=<file.png> saves the window as a picture and quits;
 /// FUJIBACKUP_DEMO_FROM=<folder> uses copies of the backups in that folder;
-/// FUJIBACKUP_CHECK=recipes saves the newest backup's recipes sheet to FUJIBACKUP_SNAPSHOT and quits;
+/// FUJIBACKUP_CHECK=recipes saves the window showing the newest backup's recipes to FUJIBACKUP_SNAPSHOT and quits;
 /// FUJIBACKUP_CHECK=notice shows a message alert and reports whether it appeared, and quits;
+/// FUJIBACKUP_CHECK=delete-prompt asks to delete the newest backup, prints whether a confirmation sheet appeared, and quits;
 /// FUJIBACKUP_CHECK=restore-prompt asks to restore the newest backup, prints whether a confirmation sheet appeared, and quits.
 @MainActor
 enum DebugSnapshot {
@@ -44,6 +45,7 @@ enum DebugSnapshot {
 
     static func takeIfRequested() async {
         if env["FUJIBACKUP_CHECK"] == "restore-prompt" { await checkRestorePrompt() }
+        if env["FUJIBACKUP_CHECK"] == "delete-prompt" { await checkDeletePrompt() }
         if env["FUJIBACKUP_CHECK"] == "recipes" { await snapshotRecipes() }
         if env["FUJIBACKUP_CHECK"] == "notice" { await checkNotice() }
         guard let path = env["FUJIBACKUP_SNAPSHOT"] else { return }
@@ -57,15 +59,15 @@ enum DebugSnapshot {
         exit(0)
     }
 
-    /// Opens the newest backup's recipes and saves the sheet to FUJIBACKUP_SNAPSHOT.
+    /// Opens the newest backup's recipes and saves the window to FUJIBACKUP_SNAPSHOT.
     private static func snapshotRecipes() async {
         try? await Task.sleep(for: .seconds(1))
         guard let model = demoModel, let path = env["FUJIBACKUP_SNAPSHOT"], let window = NSApp.windows.first(where: \.isVisible)
         else { print("recipes: no demo"); exit(2) }
         model.viewing = model.library.items.first
         try? await Task.sleep(for: .seconds(1.5))
-        guard let sheet = window.attachedSheet, let frame = sheet.contentView?.superview,
-              let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { print("recipes: no sheet"); exit(1) }
+        guard let frame = window.contentView?.superview,
+              let rep = frame.bitmapImageRepForCachingDisplay(in: frame.bounds) else { print("recipes: no window"); exit(1) }
         frame.cacheDisplay(in: frame.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
         exit(0)
@@ -79,6 +81,18 @@ enum DebugSnapshot {
         let shown = window.attachedSheet != nil
         print("notice: sheet=\(shown)")
         exit(shown ? 0 : 1)
+    }
+
+    private static func checkDeletePrompt() async {
+        try? await Task.sleep(for: .seconds(1))
+        guard let model = demoModel, let item = model.library.items.first,
+              let window = NSApp.windows.first(where: \.isVisible) else { print("delete-prompt: no demo"); exit(2) }
+        model.askToDelete(item)
+        try? await Task.sleep(for: .seconds(1.5))
+        let shown = window.attachedSheet != nil
+        let kept = model.library.items.contains(item)
+        print("delete-prompt: sheet=\(shown) stillThere=\(kept)")
+        exit(shown && kept ? 0 : 1)
     }
 
     private static func checkRestorePrompt() async {

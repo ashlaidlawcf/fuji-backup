@@ -20,6 +20,8 @@ struct ContentView: View {
                 }
         }
         .frame(minWidth: 440, minHeight: 440)
+        .overlay { RecipesPanel(model: model) }
+        .animation(.easeOut(duration: 0.18), value: model.viewing)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Show in Finder", systemImage: "folder") { model.library.reveal() }
@@ -84,13 +86,12 @@ private struct CameraHeader: View {
                 Task { await model.backUp() }
             } label: {
                 if model.activity == .backingUp {
-                    ProgressView().controlSize(.small).frame(width: 74)
+                    ProgressView().controlSize(.small).tint(.white).frame(width: 74, height: 18)
                 } else {
                     Text("Back Up").frame(width: 74)
                 }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(.flatProminent)
             .disabled(!model.canBackUp)
             .keyboardShortcut("b", modifiers: .command)
         }
@@ -198,25 +199,39 @@ private struct BackupList: View {
                     ForEach(model.library.items) { item in
                         BackupRow(item: item, canRestore: model.canBackUp,
                                   showRecipes: { model.viewing = item },
-                                  restore: { model.askToRestore(item.url) })
+                                  restore: { model.askToRestore(item.url) },
+                                  delete: { model.askToDelete(item) })
                             .tag(item.id)
                     }
                 }
             }
             .listStyle(.inset)
+            .onDeleteCommand {                     // Delete key
+                if model.viewing == nil, let item = item(model.selection.map { [$0] } ?? []) { model.askToDelete(item) }
+            }
+            // On the List, not BackupList: ContentView puts the restore alert on BackupList, and one view shows one alert.
+            .alert("Delete This Backup?", isPresented: deleting, presenting: model.pendingDelete) { pending in
+                Button("Cancel", role: .cancel) {}
+                Button("Move to Trash", role: .destructive) { model.delete(pending) }
+            } message: { pending in
+                Text("“\(pending.url.deletingPathExtension().lastPathComponent)” will be moved to the Trash.")
+            }
             .contextMenu(forSelectionType: BackupLibrary.Item.ID.self) { ids in
                 if let item = item(ids) {
                     Button("Show Recipes") { model.viewing = item }
                     Button("Restore to Camera…") { model.askToRestore(item.url) }.disabled(!model.canBackUp)
                     Button("Show in Finder") { model.library.reveal(item) }
                     Divider()
-                    Button("Move to Trash", role: .destructive) { model.library.trash(item) }
+                    Button("Move to Trash…", role: .destructive) { model.askToDelete(item) }
                 }
             } primaryAction: { ids in
                 model.viewing = item(ids)          // double-click or Return
             }
-            .sheet(item: $model.viewing) { RecipesView(item: $0) }
         }
+    }
+
+    private var deleting: Binding<Bool> {
+        Binding(get: { model.pendingDelete != nil }, set: { if !$0 { model.pendingDelete = nil } })
     }
 
     private func item(_ ids: Set<BackupLibrary.Item.ID>) -> BackupLibrary.Item? {
@@ -230,6 +245,7 @@ private struct BackupRow: View {
     let canRestore: Bool
     let showRecipes: () -> Void
     let restore: () -> Void
+    let delete: () -> Void
     @State private var hovering = false
 
     var body: some View {
@@ -246,11 +262,17 @@ private struct BackupRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            HStack(spacing: 6) {
-                Button("Recipes", action: showRecipes)
-                Button("Restore…", action: restore).disabled(!canRestore)
+            HStack(spacing: 2) {
+                Button("Recipes", systemImage: "camera.filters", action: showRecipes)
+                    .help("Show Recipes")
+                Button("Restore…", systemImage: "arrow.counterclockwise", action: restore)
+                    .help("Restore to Camera…")
+                    .disabled(!canRestore)
+                Button("Delete", systemImage: "trash", action: delete)
+                    .buttonStyle(.flatIconDestructive)
+                    .help("Move to Trash…")
             }
-            .controlSize(.small)
+            .buttonStyle(.flatIcon)
             .opacity(hovering ? 1 : 0)
         }
         .padding(.vertical, 4)
@@ -268,5 +290,31 @@ private struct BackupRow: View {
     private var details: String {
         [item.model, item.firmware.map { "Firmware \($0)" }, item.size.formatted(.byteCount(style: .file))]
             .compactMap { $0 }.joined(separator: " · ")
+    }
+}
+
+// MARK: Recipes panel
+
+/// The recipes of `model.viewing`, centred over the window (a sheet would hang from the top).
+private struct RecipesPanel: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        if let item = model.viewing {
+            ZStack {
+                Color.black.opacity(0.22)
+                    .ignoresSafeArea()
+                    .onTapGesture { model.viewing = nil }
+                RecipesView(item: item) { model.viewing = nil }
+                    .frame(maxWidth: 680, maxHeight: 720)
+                    .background(.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.separator.opacity(0.6)))
+                    .shadow(color: .black.opacity(0.25), radius: 24, y: 8)
+                    .padding(20)
+                    .accessibilityAddTraits(.isModal)
+            }
+            .transition(.opacity)
+        }
     }
 }

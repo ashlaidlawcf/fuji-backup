@@ -7,8 +7,9 @@ A small Mac app (Apple silicon, macOS 14 or later) that backs up and restores a 
 1. On the camera: **SET UP › CONNECTION SETTING › PC CONNECTION MODE › USB RAW CONV./BACKUP RESTORE**.
 2. Connect the camera by USB and open Fuji Backup.
 3. **Back Up** (⌘B) saves a backup to `~/Documents/Fuji Backups`, named like `X-T3 5.11 2026-11-21 143012.dat`.
-4. To see the recipes in a backup (C1–C7), hover over it and click **Recipes**, or double-click it. Each recipe has a copy button that copies it as text. This works for X-T3 backups for now.
-5. To restore, hover over a backup and click **Restore…**, or use **Restore from File…** in the toolbar.
+4. To see the recipes in a backup (C1–C7), hover over it and click the recipes button, or double-click it. Each recipe has a copy button that copies it as text. This works for X-T3 backups for now.
+5. To restore, hover over a backup and click the restore button, or use **Restore from File…** in the toolbar.
+6. To delete a backup, hover over it and click the trash button, or select it and press Delete, then confirm. It goes to the Trash.
 
 Before writing anything, a restore:
 - reads the camera's current settings and saves them as a new backup, so you can undo;

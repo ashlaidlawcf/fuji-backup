@@ -5,7 +5,7 @@ import FujiBackupCore
 /// C1–C7 of one backup, as cards.
 struct RecipesView: View {
     let item: BackupLibrary.Item
-    @Environment(\.dismiss) private var dismiss
+    let close: () -> Void
 
     private var settings: [CustomSetting]? {
         guard let data = try? Data(contentsOf: item.url), let backup = try? SettingsBackup(data) else { return nil }
@@ -20,7 +20,11 @@ struct RecipesView: View {
                     Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Done", action: close)
+                    .buttonStyle(.flat)
+                    .keyboardShortcut(.defaultAction)
+                // Escape closes too.
+                Button("Close", action: close).keyboardShortcut(.cancelAction).opacity(0).frame(width: 0, height: 0)
             }
             .padding(20)
             Divider()
@@ -37,7 +41,6 @@ struct RecipesView: View {
                     .frame(maxHeight: .infinity)
             }
         }
-        .frame(minWidth: 620, idealWidth: 640, minHeight: 520, idealHeight: 680)
     }
 
     private var subtitle: String {
@@ -76,7 +79,7 @@ private struct RecipeCard: View {
                     Image(systemName: copied ? "checkmark" : "doc.on.doc")
                         .contentTransition(.symbolEffect(.replace))
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.flatIcon)
                 .help("Copy Recipe as Text")
             }
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
